@@ -4,7 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 
 class Sampler(object):
 
-    def __init__(self, model, sampling_params=None, static_params=None, initial_state=None, random=None, backend=None,
+    def __init__(self, sampling_params, static_params=None, initial_state=None, random=None, backend=None,
                  resume=False, **kwargs):
         """
 
@@ -13,7 +13,7 @@ class Sampler(object):
         :param static_params:
         :param initial_state:
         """
-        self.model = model
+
         self._previous_state = None
         self.backend = backend.Backend() if backend is None else backend
 
@@ -27,7 +27,10 @@ class Sampler(object):
 
             state = self.backend.random_state
             if state is None:
-                state = np.random.get_state()
+                if random is None:
+                    state = np.random.get_state()
+                else:
+                    state = random
             iteration = self.backend.iteration
             if resume:
                 if iteration > 0:
@@ -48,15 +51,14 @@ class Sampler(object):
 
         if self._previous_state is None and initial_state is None:
             raise ValueError("Must input initial state if not resuming a run:")
+        self.dim = len(sampling_params)
 
-
-
-        self.lnprob_fct = _FnWrap(self.model.lnprob, static_params, **kwargs)
+        self.model = Model(self.dim, sampling_params, static_params=static_params, **kwargs)
+        self.lnprob_fct = self.model.wrapped_fct
 
 
     def get_random_state(self):
         return self._random.get_state()
-
 
     def run_gibs(self, n):
         """
@@ -66,11 +68,12 @@ class Sampler(object):
         """
         initial_state = self._previous_state
         results = None
-        for results in self.sample(initial_state, n, store=True):
+        acc = None
+        for acc, results in self.sample(initial_state, n, store=True):
             pass
 
         self._previous_state = results
-        return results
+        return results, acc
 
     def sample(self, initial, n, store=False, thin=1):
         if store:
@@ -80,8 +83,9 @@ class Sampler(object):
                 newState = self.propose(initial)
                 acc, newState = self.decide(newState, initial)
 
-                if store:
-                    self.backend.save_sample(acc, newState)
+            if store:
+                self.backend.save_sample(acc, newState)
+            yield acc, newState
 
 
 
@@ -91,7 +95,7 @@ class Model(object):
     for priors and likliehoods and will also have metthods that the sampler will make use of when performing Gibbs
     Sampling
     """
-    def __init__(self, D, params, likliehoods=None, priors=None, random=None):
+    def __init__(self, D, params, static_params=None, likliehoods=None, priors=None, random=None, **kwargs):
         """
         This is the initialization of the Model class to be used in our Gibbs Sampler
 
@@ -108,13 +112,11 @@ class Model(object):
 
         if likliehoods is None:
             self.liklie = mvn
-
-        if len(likliehoods) != self.dim or len(likliehoods) > 1:
+        elif len(likliehoods) != self.dim or len(likliehoods) > 1:
             raise ValueError("Likliehoods argument Must be same size as dimension, a sinlge function, or None")
         if priors is None:
-            self.prior = mvn
-
-        if len(priors) != self.dim or len(priors) > 1:
+            self.prior = 1
+        elif len(priors) != self.dim or len(priors) > 1:
             raise ValueError("Likliehoods argument Must be same size as dimension, a sinlge function, or None")
 
         if params is None:
@@ -129,6 +131,9 @@ class Model(object):
         self.liklie = likliehoods
         self.prior = priors
 
+        self.wrapped_fct = _FnWrap(self.lnprob, static_params, **kwargs)
+
+
     def lnprob(self,x, *args, **kwargs):
         """
 
@@ -139,15 +144,6 @@ class Model(object):
         """
         pass
 
-    def initialize(self, params, random=None, hypers=None):
-        state_dict = {}
-        if len(self.prior) != 1:
-            for i in params:
-                state_dict["%s" % i] = self.prior["%s" % i](random=random, hypers=hypers)
-        else:
-            for i in params:
-                state_dict["%s" % i] = self.prior(random=random, hypers=hypers)
-        return state_dict
 
 
 
