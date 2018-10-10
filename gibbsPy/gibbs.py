@@ -1,4 +1,5 @@
 import numpy as np
+import types
 
 
 class Sampler(object):
@@ -54,17 +55,16 @@ class Sampler(object):
         self._random.set_state(state)
         self.hypers = static_params
         if initial_state is not None:
-            if len(initial_state) != len(sampling_params):
+            if len(initial_state) != self.dim:
                 raise ValueError("Initial state must have values for each of the sampling parameters")
             if self._previous_state is None:
-                self._previous_state = State(initial_state, sampling_params, data=self.data,
-                                             random=self.get_random_state())
+                self._previous_state = State(initial_state, data=self.data,random=self.get_random_state())
 
         if self._previous_state is None and initial_state is None:
             raise ValueError("Must input initial state if not resuming a run:")
 
-        self.model = Model(self.dim, sampling_params, static_params=static_params, data=self.data,
-                           random=self.get_random_state(), **kwargs)
+        self.model = Model(self.dim, self.params, static_params=None if static_params is None else static_params,
+                           data=self.data,random=self.get_random_state(), **kwargs)
         self.conditional_fct = self.model.wrapped_fct
 
     def has_data(self):
@@ -97,7 +97,8 @@ class Sampler(object):
             self.backend.grow(n)
         for _ in range(n):
             for _ in range(thin):
-                newState = self.conditional_fct(initial)
+                for i in range(self.dim):
+                    newState.pos[i] = self.conditional_fct(initial.pos[np.arange(int(len(initial.pos)))!=i])
 
             if store:
                 self.backend.save_sample(newState)
@@ -130,8 +131,9 @@ class Model(object):
         """
 
         self.dim = D
-        if len(cond_fct) != 1 or len(cond_fct) != D:
-            raise ValueError("Cond_fct must be a single fct for each parameter or a list of D fcts where "
+        if not isinstance(cond_fct, types.FunctionType):
+            if len(cond_fct) != self.dim:
+                raise ValueError("Cond_fct must be a single fct for each parameter or a list of D fcts where "
                              "D is the dimension of the model:")
 
         if params is None:
@@ -147,20 +149,13 @@ class Model(object):
             self.data = data
         else:
             self.data = None
-        self.wrapped_fct = _FnWrap(self.conditional, static_params, data=self.data, **kwargs)
+        if isinstance(cond_fct, types.FunctionType):
+            self.wrapped_fct = _FnWrap(cond_fct, static_params, data=self.data, random=random, **kwargs)
+        else:
+            self.wrapped_fct = self.multi_wrap(cond_fct, static_params, data=self.data, random=random, **kwargs)
 
-    def conditional(self, x, *args, **kwargs):
-        for i in range(len(x)):
-            joint = self.joint_dist(x[0][i], x[0][np.arange(len(x)!=i)], *args, **kwargs)
-            marginal = self.marginal_dist(x[0][i], x[0][np.arange(len(x)!=i)], *args, **kwargs)
-            x[0][i] = joint/marginal
-        return x
-
-    def joint_dist(self, sampling_param, position, *args, **kwargs):
-        return True
-
-    def marginal_dist(self, sampling_param, position, *args, **kwargs):
-        return True
+    def multi_wrap(self, fcts, hypers, data=None,random=None, **kwargs):
+        return _FnWrap(fcts, hypers, data=data, random=random, **kwargs)
 
     def has_data(self):
         return True if self.data is not None else False
@@ -172,7 +167,7 @@ class State(object):
     Its main purposes is to hold the params list and whatever point in parameter space the markov chain is currently at
     Will also contain methods used in the sampler object
     """
-    def __init__(self, pos, params, data=None, random=None):
+    def __init__(self, pos, data=None, random=None):
         """
         This is the Initalization of our State class to be used in the sampler
 
@@ -182,9 +177,6 @@ class State(object):
         value it takes
         """
 
-        if len(params) != len(pos):
-            raise ValueError("Cannot create new State Object instance with len(params)!=len(position)")
-        self.params = params
         self.pos = pos
         if random is not None:
             self.random_state = random
@@ -196,27 +188,32 @@ class State(object):
         return True if self.data is not None else False
 
     def __repr__(self):
-        return "State({0}, data={1}, random_state={2})".format(self.params, self.data, self.random_state)
+        return "State(pos={0}, data={1}, random_state={2})".format(self.pos, self.data, self.random_state)
 
     def __iter__(self):
-        return iter((self.params, self.data, self.random_state))
+        return iter((self.pos, self.data, self.random_state))
 
 
 class _FnWrap(object):
     """
     This is a wrapper class for ease of calling the ln_prob_fct (i.e. the likliehood fcts that the model holds)
     """
-    def __init__(self,func, data = None, *args, **kwargs):
+    def __init__(self,func, *args, data = None, random = None, **kwargs):
         """
 
         :param func:
         :param args:
         :param kwargs:
         """
-        self.args = [] if args is None else args
+        self.args = []
+        for arg in args:
+            if arg is not None:
+                self.args.append(arg)
+        print(self.args)
         self.kwargs = {} if kwargs is None else kwargs
         self.function = func
         self.data = data
+        self.random = random
 
     def __call__(self,x):
         """
@@ -225,11 +222,12 @@ class _FnWrap(object):
         :return:
         """
         try:
-            return self.function(x, self.data, *self.args, *self.kwargs)
+            print(self.args, self.kwargs)
+            return self.function(x, self.data,random=self.random, *self.args, *self.kwargs)
         except:
             import traceback
             print("gibbsPy: Exception while calling your likelihood function:")
-            print("  params:", x)
+            print("  pos[i]:", x)
             print("  args:", self.args)
             print("  kwargs:", self.kwargs)
             print("  exception:")
@@ -258,7 +256,6 @@ class Backend(object):
     def save_sample(self, state):
         self._check_state(state)
         self.chain[self.iteration, :] = state.pos
-        self.logprobs[self.iteration] = state.logprob
         self.random_state = state.random
         self.iteration += 1
 
