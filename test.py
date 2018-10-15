@@ -20,7 +20,7 @@ def generate_coinflip_data(N, D):
 
 data = generate_coinflip_data(100, dim)
 initial_state = np.array([0.2, 0.4])
-sampler = gp.gibbs.Sampler(D, params, initial_state=initial_state, data=data, cond_fct=conditional_function)
+sampler = gp.gibbs.Sampler(dim, params, initial_state=initial_state, data=data, cond_fct=conditional_function)
 
 sampler.run_gibs(1000)
 chain = sampler.get_chain()
