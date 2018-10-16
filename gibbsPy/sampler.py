@@ -110,6 +110,7 @@ class Sampler(object):
             self.backend.reset(self.dim)
             state = self.backend.random_state
 
+        # Setup the Random number generator with new state random or the passed in state from the previous backend
         if state is None:
             if random is None:
                 state = np.random.get_state()
@@ -128,48 +129,103 @@ class Sampler(object):
             if self._previous_state is None:
                 self._previous_state = state.State(initial_state, data=self.data,random=self._random)
 
+        # make sure we have either a previous state or initialstate
         if self._previous_state is None and initial_state is None:
             raise ValueError("Must input initial state if not resuming a run:")
 
+        # Setup the model to be used:
         self.model = model.Model(self.dim, self.params, static_params=None if static_params is None else static_params,
-                           data=self.data,random=self._random, **kwargs)
+                                 data=self.data,random=self._random, **kwargs)
+        # retreive the wrapped conditional function from the model (uses our handy function wrapper so that we can
+        # use kwargs or args when calling the fct without having to call them each time:
         self.conditional_fct = self.model.wrapped_fct
 
     def has_data(self):
+        """
+        Function returns true/false whether or not we setup the sampler with some observed data or not.
+
+        :return: True if self.data is not None, otherwise return False
+        """
         return True if self.data is not None else False
 
-    def run_gibs(self, n):
+    def run_gibs(self, n, store=True):
+        """
+        This is the main function that will run the gibbs sampler
+
+        :param n: This is the number of steps to run the sampler for
+
+        :param store: (optional) This a bool value that determines if we save our samples in our backend object or not
+        defaults to True
+
+        :return: this returns the final state of the chain (must use the backend object to retreieve all of the samples
         """
 
-        :param n:
-        :return:
-        """
+        # Setup the initial state
         if self._previous_state is not None:
             initial_state = self._previous_state
         else:
             raise ValueError("The previous sate of the sampler must be set when "
                              "intializing sampler or the backend must have been ran before with resume=True:")
-        results = None
-        for results in self.sample(initial_state, n, store=True):
-            pass
 
+        results = None
+        # run the generator to generate each successive samples
+        for results in self.sample(initial_state, n, store=store):
+            pass
+        # store the last state as the previous state for the sample/backend
         self._previous_state = results
         return results
 
     def sample(self, initial, n, store=False, thin=1):
+        """
+        This is the Generator for sampling the next values from the conditional distribution we are trying to sample
+        from
+
+        :param initial: THis is the initial state we are in must be an instance of State object
+
+        :param n: Number of steps to evovle our chain
+
+        :param store: (optional) bool value that sets whether we store the values in the backend or not defaults to False
+
+        :param thin: (optional) This value is how many samples we want to thin the chain by. defaults to no thinning
+        (thin = 1)
+
+        :return: This is a generator so it yields the next sample at each iteration: (samples are object instances of
+        the State object)
+        """
+        # Initialize the newState as the old
         newState = initial
+
+        # if we store the values grow the backend for faster saving
         if store:
             self.backend.grow(n)
-        for _ in range(n):
-            for _ in range(thin):
-                for i in range(self.dim):
-                    newState.pos[i] = self.conditional_fct(initial.pos, i)
 
+        # Loop through our desired range
+        for _ in range(n):
+            # loop through the thinning procedure
+            for _ in range(thin):
+                # Loop through each parameter dimension since Gibbs Sampling algorithm has us directly sample each
+                # parameter from the conditional probability functions:
+                for i in range(self.dim):
+                    # find the new value for paramter i feom the conditinoal distribution
+                    newState.pos[i] = self.conditional_fct(initial.pos, i)
+            # If we store we want to save each sample in the backend (after thinning since n is final amount of samples
+            # we want)
             if store:
                 self.backend.save_sample(newState)
+            # generate the state
             yield newState
 
     def get_chain(self, **kwargs):
+        """
+        This is a function that connects the sampler with the backend so we can get the chain out:
+
+        :param kwargs: These kwargs are optional values passed to the backend get_chain_fct. These are listed in the
+        backend.get_chain() method documentation
+
+        :return: This returns the numpy array of the chain position in parameter space at each iteration
+        """
+
+        # make sure the backend was intialized before retrieving the chain data
         if self.backend.initialized:
             return self.backend.get_chain(**kwargs)
         else:
