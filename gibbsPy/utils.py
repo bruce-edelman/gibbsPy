@@ -14,18 +14,27 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+"""
+This file sets up useful utility functions and/or classes to be used in other files of gibbsPy
+"""
+
 
 class _FnWrap(object):
     """
-    This is a wrapper class for ease of calling the ln_prob_fct (i.e. the likliehood fcts that the model holds)
+    This is a wrapper class for ease of calling the conditional function (i.e. the cond_fct that the model holds)
     """
     def __init__(self, func, *args, data = None, random = None, **kwargs):
         """
+        The intialization of our function wrapper class
 
-        :param func:
-        :param args:
-        :param kwargs:
+        :param func: the function we want to wrap. Must be of type function
+
+        :param args: (optional) args that are passed into the function
+        :param data: data that is passed to the function
+        :param random: (optional) random number state from numpy.random.RandomState()
+        :param kwargs: (optional) keyword arguments that the function may need to use
         """
+
         self.args = []
         for arg in args:
             if arg is not None:
@@ -37,9 +46,13 @@ class _FnWrap(object):
 
     def __call__(self, x, idx):
         """
+        The call for our function after it is wrapped
 
-        :param x:
-        :return:
+        :param x: The position in parameter space we want to evaluate the function at
+
+        :param idx: The index of the parameter we wish to evaluate at
+
+        :return:retuns the output of the wrapped function
         """
         try:
             return self.function(x, idx, self.data, random=self.random, *self.args, *self.kwargs)

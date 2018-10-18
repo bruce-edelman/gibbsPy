@@ -17,6 +17,9 @@
 
 import numpy as np
 
+"""
+This File sets up the State object class for the gibbsPy sampling
+"""
 
 class State(object):
     """
@@ -28,20 +31,33 @@ class State(object):
         """
         This is the Initalization of our State class to be used in the sampler
 
-        :param sampling_params: This is a dictionary that stores the string name of each sampling parameter and the
-        current value of each of the parameters
-        :param static_params: This is a dictionary that stores the string name of each static parameter and the constant
-        value it takes
+        :param pos: This si the position of the state in the D-dimensional parameter space. It is a numpy array of
+        shape = D
+
+        :param random: (optional) If we want the state to store a np.random.RandomState() instance to handle proper
+        sampling resuming
         """
 
         self.pos = pos
+
+        # If we don't intialize with a random state already get a new one from numpy
         if random is not None:
             self.random_state = random
         else:
             self.random_state = np.random.get_state()
 
     def __repr__(self):
+        """
+        This function sets up the proper object representation of our State object using the python __repr__ method
+
+        :return: returns a string representation of our state with the position and random state
+        """
         return "State(pos={0}, random_state={1})".format(self.pos, self.random_state)
 
     def __iter__(self):
+        """
+        THis function sets up how our class object will handle iterating through using the python __iter__ method
+
+        :return: returns an iter object that iterates throught the positiona nd then the random state
+        """
         return iter((self.pos, self.random_state))
