@@ -17,6 +17,7 @@
 import numpy as np
 from . import backend
 from . import model
+from . import state
 
 """
 This File sets up the Sampler class that performs the gibbs sampling in gibbsPy
@@ -46,14 +47,14 @@ class Sampler(object):
         If this is passed it is a numpy array of length = D that holds the starting paramter value for each sampling
         param in order of sampling_params list:
         If initial_state is given and also resume=True along with an initialized backend we take the backend previous
-        state over the passed initial state:
+        state over the passed initial ranstate:
 
-        :param random: (optional) If we pass this it must be an instance of a numpy random state. If it is set and also
-        backend is set from a previous run the backends random state takes priority:
+        :param random: (optional) If we pass this it must be an instance of a numpy random ranstate. If it is set and also
+        backend is set from a previous run the backends random ranstate takes priority:
 
         :param back: (optional) If we want to resume a previous run we must have resume=True, and back set to a
         backend.Backend() object instance that was from the previous run. This backend must be initialized (meaning it
-        was used in a previous run and has _previous_state attribute stored that is a state.State() object instance
+        was used in a previous run and has _previous_state attribute stored that is a ranstate.State() object instance
 
         :param resume: (optional) this is a Bool, defaults to False. If set to true it will try and add on to the chain
         in the backend object, if false we will either create a new backend object or reset the passed in backend and
@@ -84,7 +85,7 @@ class Sampler(object):
 
         # Handle resuming from backend sent in if there: Make sure to get the current random state from backend if
         # possible to keep us starting from that pos:
-        state = None
+        ranstate = None
         self._previous_state = None
         self.backend = backend.Backend() if back is None else back
         if data is not None:
@@ -94,12 +95,12 @@ class Sampler(object):
         if not self.backend.initialized and not resume:
             self._previous_state = None
             self.backend.reset(self.dim)
-            state = np.random.get_state()
+            ranstate = np.random.get_state()
         elif self.backend.initialized and resume:
             if self.backend.shape != self.model.dim:
                 raise ValueError("The shape of backend does not match the model dimension")
 
-            state = self.backend.random_state
+            ranstate = self.backend.random_state
             iteration = self.backend.iteration
             if iteration > 0:
                 self._previous_state = self.backend.get_last_sample()
@@ -108,33 +109,33 @@ class Sampler(object):
         elif self.backend.initialized and not resume:
             self._previous_state = self.backend.get_last_sample()
             self.backend.reset(self.dim)
-            state = self.backend.random_state
+            ranstate = self.backend.random_state
 
         # Setup the Random number generator with new state random or the passed in state from the previous backend
-        if state is None:
+        if ranstate is None:
             if random is None:
-                state = np.random.get_state()
+                ranstate = np.random.get_state()
             else:
-                state = random
+                ranstate = random
         self._random = np.random.RandomState()
-        self._random.set_state(state)
+        self._random.set_state(ranstate)
 
         # initialize our hyper parameters(static_params)
         self.hypers = static_params
 
-        # Handle exceptions with initial state:
+        # Handle exceptions with initial ranstate:
         if initial_state is not None:
             if len(initial_state) != self.dim:
                 raise ValueError("Initial state must have values for each of the sampling parameters")
             if self._previous_state is None:
-                self._previous_state = state.State(initial_state, data=self.data,random=self._random)
+                self._previous_state = state.State(initial_state, random=self._random)
 
         # make sure we have either a previous state or initialstate
         if self._previous_state is None and initial_state is None:
-            raise ValueError("Must input initial state if not resuming a run:")
+            raise ValueError("Must input initial ranstate if not resuming a run:")
 
         # Setup the model to be used:
-        self.model = model.Model(self.dim, self.params, static_params=None if static_params is None else static_params,
+        self.model = model.Model(self.dim, params=self.params, static_params=None if static_params is None else static_params,
                                  data=self.data,random=self._random, **kwargs)
         # retreive the wrapped conditional function from the model (uses our handy function wrapper so that we can
         # use kwargs or args when calling the fct without having to call them each time:

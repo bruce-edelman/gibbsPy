@@ -27,7 +27,7 @@ class Model(object):
     """
     This is a class object to hold the structure of the model we setup for our gibbs sampling.
     """
-    def __init__(self, D, cond_fct, params=None, static_params=None,data=None, random=None, **kwargs):
+    def __init__(self, D, cond_fct=None, params=None, static_params=None,data=None, random=None, **kwargs):
         """
         This is the initialization of the Model class to be used in our Gibbs Sampler
 
