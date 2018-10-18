@@ -208,7 +208,11 @@ class Sampler(object):
                 # parameter from the conditional probability functions:
                 for i in range(self.dim):
                     # find the new value for paramter i feom the conditinoal distribution
-                    newState.pos[i] = self.conditional_fct(initial.pos, i)
+                    try:
+                        idx = self.conditional_fct[i].idx
+                        newState.pos[idx] = self.conditional_fct[i](initial.pos, i)
+                    except IndexError:
+                        newState.pos[i] = self.conditional_fct(initial.pos, i)
             # If we store we want to save each sample in the backend (after thinning since n is final amount of samples
             # we want)
             if store:

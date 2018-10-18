@@ -81,15 +81,37 @@ class Model(object):
 
     def multi_wrap(self, fcts, hypers, data=None,random=None, **kwargs):
         """
-        #TODO finish this function (right now it does nothing for us)
-        :param fcts:
-        :param hypers:
-        :param data:
-        :param random:
-        :param kwargs:
-        :return:
+        # This fucntion handles using our wrapper class to wrap each function if we give a list of D functions
+        corresponding to each sampling parameter
+
+        :param fcts: The list of conditional functions we want to wrap
+
+        :param hypers:(if None is given to sampler this will be set as None) the hyper parameters that the function may
+        need (static parameters)
+
+        :param data: (optional) This si the data if we use any to be used in the condtional fcts
+
+        :param random: (optional) numpy random number generator state
+
+        :param kwargs: (optional) kwargs to be wrapped into the function in _FnWrap
+
+        :return:returns a list of objects with each element being an instance of the _FnWrap object. each object element
+        should have attribute .idx that is the index value that corresponds to the parameter that that particular
+        conditional fucnction evaluates
         """
-        return utils._FnWrap(fcts, hypers, data=data, random=random, **kwargs)
+
+        # Make sure each element of the list is a function type
+        for i in fcts:
+            if not isinstance(i, types.FunctionType):
+                raise ValueError("Each element in cond_fct must be of type: Function")
+
+        # intialize list
+        wrapped_fcts = []
+
+        # loop through fcts and append list with wrapped fcts
+        for k,i in enumerate(fcts):
+            wrapped_fcts.append(utils._FnWrap(i, hypers, data=data, random=random, idx=k, **kwargs))
+        return wrapped_fcts
 
     def has_data(self):
         """

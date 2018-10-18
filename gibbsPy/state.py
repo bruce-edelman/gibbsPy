@@ -21,6 +21,7 @@ import numpy as np
 This File sets up the State object class for the gibbsPy sampling
 """
 
+
 class State(object):
     """
     This is a class to hold the current state and handle state updating for the Gibbs Sampler Object

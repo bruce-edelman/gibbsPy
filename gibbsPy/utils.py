@@ -23,7 +23,7 @@ class _FnWrap(object):
     """
     This is a wrapper class for ease of calling the conditional function (i.e. the cond_fct that the model holds)
     """
-    def __init__(self, func, *args, data = None, random = None, **kwargs):
+    def __init__(self, func, *args, data = None, random = None, idx=None, **kwargs):
         """
         The intialization of our function wrapper class
 
@@ -32,9 +32,15 @@ class _FnWrap(object):
         :param args: (optional) args that are passed into the function
         :param data: data that is passed to the function
         :param random: (optional) random number state from numpy.random.RandomState()
+        :param idx: (optional) If we wrap multiple functions for the conditional then this object will store the index
+        of which parameter it corresponds to:
         :param kwargs: (optional) keyword arguments that the function may need to use
         """
 
+        if idx is not None:
+            self.idx = idx
+        else:
+            self.idx = None
         self.args = []
         for arg in args:
             if arg is not None:
