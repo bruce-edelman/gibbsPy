@@ -18,6 +18,7 @@ import numpy as np
 from . import backend
 from . import model
 from . import state
+from . import pbar
 
 """
 This File sets up the Sampler class that performs the gibbs sampling in gibbsPy
@@ -149,7 +150,7 @@ class Sampler(object):
         """
         return True if self.data is not None else False
 
-    def run_gibs(self, n, store=True):
+    def run_gibs(self, n, store=True, **kwargs):
         """
         This is the main function that will run the gibbs sampler
 
@@ -157,6 +158,8 @@ class Sampler(object):
 
         :param store: (optional) This a bool value that determines if we save our samples in our backend object or not
         defaults to True
+
+        :param kwargs: #TODO Comment this pls
 
         :return: this returns the final state of the chain (must use the backend object to retreieve all of the samples
         """
@@ -176,7 +179,7 @@ class Sampler(object):
         self._previous_state = results
         return results
 
-    def sample(self, initial, n, store=False, thin=1):
+    def sample(self, initial, n, store=False, thin=1, progress=False):
         """
         This is the Generator for sampling the next values from the conditional distribution we are trying to sample
         from
@@ -190,6 +193,8 @@ class Sampler(object):
         :param thin: (optional) This value is how many samples we want to thin the chain by. defaults to no thinning
         (thin = 1)
 
+        :param progress: (optional) #TODO comment this pls
+
         :return: This is a generator so it yields the next sample at each iteration: (samples are object instances of
         the State object)
         """
@@ -199,26 +204,41 @@ class Sampler(object):
         # if we store the values grow the backend for faster saving
         if store:
             self.backend.grow(n)
+            # Check if we set thinning up or not
+        if thin is not None:
+            thin = int(thin)
+            # error check to make sure thin is not negative or 0
+            if thin <= 0:
+                raise ValueError("Thin must be strictly positive:")
+            intermediate_step = thin
+        else:
+            # if no thin set int_step=1
+            intermediate_step = 1
+        # set the total iterations for pbar
+        total = n * intermediate_step
+        # set up our progress bar
+        with pbar.progress_bar(progress, total) as prog_bar:
+            # Loop through our desired range
+            for _ in range(n):
+                # loop through the thinning procedure
+                for _ in range(thin):
+                    # Loop through each parameter dimension since Gibbs Sampling algorithm has us directly sample each
+                    # parameter from the conditional probability functions:
+                    for i in range(self.dim):
+                        # find the new value for paramter i feom the conditinoal distribution
+                        try:
+                            idx = self.conditional_fct[i].idx
+                            newState.pos[idx] = self.conditional_fct[i](initial.pos, i)
+                        except IndexError:
+                            newState.pos[i] = self.conditional_fct(initial.pos, i)
 
-        # Loop through our desired range
-        for _ in range(n):
-            # loop through the thinning procedure
-            for _ in range(thin):
-                # Loop through each parameter dimension since Gibbs Sampling algorithm has us directly sample each
-                # parameter from the conditional probability functions:
-                for i in range(self.dim):
-                    # find the new value for paramter i feom the conditinoal distribution
-                    try:
-                        idx = self.conditional_fct[i].idx
-                        newState.pos[idx] = self.conditional_fct[i](initial.pos, i)
-                    except IndexError:
-                        newState.pos[i] = self.conditional_fct(initial.pos, i)
-            # If we store we want to save each sample in the backend (after thinning since n is final amount of samples
-            # we want)
-            if store:
-                self.backend.save_sample(newState)
-            # generate the state
-            yield newState
+                    prog_bar.update(1)
+                # If we store we want to save each sample in the backend (after thinning since n is final amount of
+                # samples we want)
+                if store:
+                    self.backend.save_sample(newState)
+                # generate the state
+                yield newState
 
     def get_chain(self, **kwargs):
         """

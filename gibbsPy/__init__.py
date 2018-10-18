@@ -19,6 +19,7 @@ from . import sampler
 from . import model
 from . import state
 from . import utils
+from . import pbar
 
 __version__ = '0.1.0'
 __authors__ = ['Bruce Edelman']
