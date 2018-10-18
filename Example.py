@@ -16,13 +16,19 @@ dim = 2
 
 def generate_coinflip_data(N, D):
     size = (N, D)
-    return np.random.choice((0,1), size=size, p=(0.7,0.3))
+    data = np.zeros(size)
+    data[:,0] = np.random.choice((0, 1), size=N, p=(0.7, 0.3))
+    data[:,1] = np.random.choice((0, 1), size=N, p=(0.3, 0.7))
+    return data
 
-data = generate_coinflip_data(10, 2)
+data = generate_coinflip_data(48, 2)
+
 initial_state = np.array([0.2, 0.4])
 sampler = gp.sampler.Sampler(dim, params, initial_state=initial_state, data=data, cond_fct=conditional_function)
 
-sampler.run_gibs(100000)
+sampler.run_gibs(10000, progress=True)
 chain = sampler.get_chain()
-corner.corner(chain, range=[(0.,1.), (0.,1.)], labels=params, show_titles=True)
+corner.corner(chain, range=[(0.,1.), (0.,1.)], labels=params, show_titles=True,
+              quantities=(0.05,0.95))
+
 plt.show()

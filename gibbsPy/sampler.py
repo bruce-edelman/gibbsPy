@@ -18,7 +18,7 @@ import numpy as np
 from . import backend
 from . import model
 from . import state
-from . import pbar
+from .pbar import *
 
 """
 This File sets up the Sampler class that performs the gibbs sampling in gibbsPy
@@ -159,7 +159,7 @@ class Sampler(object):
         :param store: (optional) This a bool value that determines if we save our samples in our backend object or not
         defaults to True
 
-        :param kwargs: #TODO Comment this pls
+        :param kwargs: (optional) these keyword args are passed into sample (currently include thin=1, progress=False)
 
         :return: this returns the final state of the chain (must use the backend object to retreieve all of the samples
         """
@@ -173,7 +173,7 @@ class Sampler(object):
 
         results = None
         # run the generator to generate each successive samples
-        for results in self.sample(initial_state, n, store=store):
+        for results in self.sample(initial_state, n, store=store, **kwargs):
             pass
         # store the last state as the previous state for the sample/backend
         self._previous_state = results
@@ -193,7 +193,8 @@ class Sampler(object):
         :param thin: (optional) This value is how many samples we want to thin the chain by. defaults to no thinning
         (thin = 1)
 
-        :param progress: (optional) #TODO comment this pls
+        :param progress: (optional) Boolean value set from the kwargs passed into run_gibbs or burnin_gibbs that decides
+        whether or not to show a progress bar during sampling. defaults to False
 
         :return: This is a generator so it yields the next sample at each iteration: (samples are object instances of
         the State object)
@@ -217,7 +218,7 @@ class Sampler(object):
         # set the total iterations for pbar
         total = n * intermediate_step
         # set up our progress bar
-        with pbar.progress_bar(progress, total) as prog_bar:
+        with progress_bar(progress, total) as prog_bar:
             # Loop through our desired range
             for _ in range(n):
                 # loop through the thinning procedure
@@ -229,7 +230,7 @@ class Sampler(object):
                         try:
                             idx = self.conditional_fct[i].idx
                             newState.pos[idx] = self.conditional_fct[i](initial.pos, i)
-                        except IndexError:
+                        except TypeError:
                             newState.pos[i] = self.conditional_fct(initial.pos, i)
 
                     prog_bar.update(1)
