@@ -17,7 +17,9 @@
 """
 This file sets up useful utility functions and/or classes to be used in other files of gibbsPy
 """
-
+import numpy as np
+import corner
+import matplotlib.pyplot as plt
 
 class _FnWrap(object):
     """
@@ -71,3 +73,77 @@ class _FnWrap(object):
             print("  exception:")
             traceback.print_exc()
             raise
+
+def compute_acl(chain):
+    pass
+
+def compute_act(chain):
+    pass
+
+def plot_corner(chain, labels, trues=None, file=None):
+    """
+
+    :param chain:
+    :param labels:
+    :param trues:
+    :param file:
+    :return:
+    """
+    fig = corner.corner(chain, range=[(0., 1.), (0., 1.), (0., 1.), (0., 1.)], labels=labels, show_titles=True,
+                        quantities=(0.05, 0.95))
+    dim = len(labels)
+    # Extract the axes
+    axes = np.array(fig.axes).reshape((dim, dim))
+    if trues is not None:
+        # Loop over the diagonal
+        for i in range(dim):
+            ax = axes[i, i]
+            ax.axvline(trues[i], color="g")
+        # Loop over the histograms
+        for yi in range(dim):
+            for xi in range(yi):
+                ax = axes[yi, xi]
+                ax.axvline(trues[xi], color="g")
+                ax.axhline(trues[yi], color="g")
+                ax.plot(trues[xi], trues[yi], "sg")
+    plt.show()
+    if file is not None:
+        plt.savefig(file)
+
+
+def plot_trace(chain, labels, trues=None, file=None):
+    """
+
+    :param chain:
+    :param labels:
+    :param trues:
+    :param file:
+    :return:
+    """
+    dim = len(labels)
+    fig, axs = plt.subplots(nrows=dim, ncols=2, figsize=(10, 15))
+    fig.subplots_adjust(hspace=0.75)
+    for i in range(dim):
+        ax = axs[i][0]
+        ax.set_title('%s histogram' % labels[i])
+        ax.hist(chain[:, i], bins=50, density=True, alpha=0.5)
+        if trues is not None:
+            ax.axvline(trues[i], color='r', label=r'$\theta_{true}$')
+        ax.set_xlim(0, 1)
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel('density')
+        ax.legend()
+        ax = axs[i][1]
+        ax.set_ylim(0, 1)
+        ax.set_title('%s Traceplot' % labels[i])
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel(labels[i])
+        if trues is not None:
+            ax.axhline(trues[i], color='r', label=r'$\theta_{true}$')
+        ax.plot(chain[:, i], alpha=0.4)
+        ax.legend()
+
+    plt.suptitle('GibbsPy TracePlot')
+    plt.show()
+    if file is not None:
+        plt.savefig(file)

@@ -150,6 +150,18 @@ class Sampler(object):
         """
         return True if self.data is not None else False
 
+    def burnin(self, store=False, iter=None, act=True, acl=False, progress=True, **kwargs):
+        """
+
+        :param store:
+        :param iter:
+        :param act:
+        :param acl:
+        :param progress:
+        :param kwargs:
+        :return:
+        """
+
     def run_gibs(self, n, store=True, **kwargs):
         """
         This is the main function that will run the gibbs sampler
